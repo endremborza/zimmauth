@@ -185,6 +185,12 @@ class ZimmAuth:
 
         return cls(toml.loads(toml_str))
 
+    @staticmethod
+    def dumps_dict(dic: dict, password: str):
+        import toml
+
+        return EncryptBase().encrypt_str(toml.dumps(dic), password)
+
     def _dump_keys(self, root: Path):
         root.mkdir(exist_ok=True, parents=True)
         for key_id, keystr in self._rsa_keys.items():

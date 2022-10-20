@@ -5,7 +5,6 @@ from pathlib import Path
 import boto3
 import moto
 import pytest
-import toml
 from cryptography.fernet import InvalidToken
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
@@ -121,15 +120,13 @@ def test_ssh(zauth: ZimmAuth, zauth_root: Path):
 
 
 def test_env_loading():
-    toml_str = toml.dumps(
-        {
-            "rsa-keys": {"abc": "XYZ"},
-            "keys": {"s31": {"key": "xy", "secret": "123"}},
-            "buc1": {"key": "s31"},
-        }
-    )
+    dic = {
+        "rsa-keys": {"abc": "XYZ"},
+        "keys": {"s31": {"key": "xy", "secret": "123"}},
+        "buc1": {"key": "s31"},
+    }
     test_pw = "Pw742"
-    os.environ["__ZDIC"] = EncryptBase().encrypt_str(toml_str, test_pw)
+    os.environ["__ZDIC"] = ZimmAuth.dumps_dict(dic, test_pw)
     os.environ["__ZPW"] = test_pw
     zauth = ZimmAuth.from_env("__ZDIC", "__ZPW")
     assert "abc" in zauth._rsa_keys.keys()
