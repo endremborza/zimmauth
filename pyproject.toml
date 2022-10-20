@@ -8,7 +8,7 @@ requires-python = ">=3.8"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["branthebuilder"]
+test = ["branthebuilder", "mock-ssh-server", "dvc", "fabric", "boto3", "toml", "moto"]
 doc = ["branthebuilder[doc]"]
 
 [project.urls]
