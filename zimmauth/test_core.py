@@ -75,6 +75,7 @@ def zauth(server: Server, private_key_path: Path, zauth_root: Path):
 @pytest.fixture
 def idiotic():
     # https://github.com/aio-libs/aiobotocore/issues/755
+    # https://github.com/fsspec/s3fs/issues/357
 
     import aiobotocore.awsrequest
     import botocore.awsrequest
