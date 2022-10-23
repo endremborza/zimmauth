@@ -199,5 +199,5 @@ class ZimmAuth:
             key_path.chmod(0o600)
 
     @property
-    def _remotes(self) -> dict[str, Union[S3Remote, SSHRemote]]:
+    def _remotes(self) -> Dict[str, Union[S3Remote, SSHRemote]]:
         return {**self._s3_remotes, **self._ssh_remotes}
