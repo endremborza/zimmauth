@@ -181,6 +181,7 @@ class ZimmAuth:
 
         toml_str = os.environ.get(dic_env_var, "")
         if pw_env_var:
+            assert toml_str, f"Nothing given for {dic_env_var}"
             toml_str = EncryptBase().decrypt(toml_str, os.environ[pw_env_var]).decode()
 
         return cls(toml.loads(toml_str))
