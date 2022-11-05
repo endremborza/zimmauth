@@ -1,6 +1,5 @@
 import os
 import secrets
-import socket
 from base64 import urlsafe_b64decode as b64d
 from base64 import urlsafe_b64encode as b64e
 from contextlib import contextmanager
@@ -16,6 +15,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 CONF_PATH = Path.home() / ".zimmauth"
+LOCAL_HOST_NAMES_ENV_VAR = "ZAUTH_LOCAL_HOST_NAMES"
 
 
 @dataclass
@@ -120,8 +120,6 @@ class ZimmAuth:
             if "connection" in r.keys():
                 ssh_conf = _ssh_hosts[r.pop("connection")]
                 remote = SSHRemote(**ssh_conf, **r)
-                if remote.host == socket.gethostname():
-                    pass  # TODO
                 self._ssh_remotes[k] = remote
 
     def get_auth(self, remote_id: str) -> S3Auth:
@@ -131,24 +129,30 @@ class ZimmAuth:
     def get_fabric_connection(self, remote_name: str):
         from fabric import Connection
 
-        ssh_rem = self._ssh_remotes[remote_name]
+        from .local_conn import LocalContext
+
         tmp_dir = TemporaryDirectory()
-        key_path = Path(tmp_dir.name, "key")
-        c_kwargs = {}
+        ssh_rem = self._ssh_remotes[remote_name]
+        local_names = os.environ.get(LOCAL_HOST_NAMES_ENV_VAR, "").split(";")
+        if ssh_rem.host in local_names:
+            ctx = LocalContext()
+        else:
+            key_path = Path(tmp_dir.name, "key")
+            c_kwargs = {}
 
-        if ssh_rem.rsa_key:
-            key = self._rsa_keys[ssh_rem.rsa_key]
-            key_path.write_text(key)
-            c_kwargs["key_filename"] = key_path.absolute().as_posix()
+            if ssh_rem.rsa_key:
+                key = self._rsa_keys[ssh_rem.rsa_key]
+                key_path.write_text(key)
+                c_kwargs["key_filename"] = key_path.absolute().as_posix()
 
-        conn = Connection(
-            host=ssh_rem.host,
-            user=ssh_rem.user,
-            port=ssh_rem.port,
-            connect_kwargs=c_kwargs,
-        )
-        with conn.cd(ssh_rem.path):
-            yield conn
+            ctx = Connection(
+                host=ssh_rem.host,
+                user=ssh_rem.user,
+                port=ssh_rem.port,
+                connect_kwargs=c_kwargs,
+            )
+        with ctx.cd(ssh_rem.path):
+            yield ctx
         tmp_dir.cleanup()
 
     def dump_dvc(self, local=True, key_store=CONF_PATH):

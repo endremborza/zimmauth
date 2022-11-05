@@ -4,7 +4,6 @@ from pathlib import Path
 
 import boto3
 import moto
-import pytest
 from cryptography.fernet import InvalidToken
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
@@ -13,9 +12,10 @@ from dvc.repo import Repo
 from mockssh.server import Server
 from pytest import fixture, raises
 
-from zimmauth.core import EncryptBase, ZimmAuth
+from zimmauth.core import LOCAL_HOST_NAMES_ENV_VAR, EncryptBase, ZimmAuth
 
 TEST_USER = "zuzzer"
+TEST_HOST = "zhost"
 
 
 @fixture(scope="session")
@@ -48,8 +48,16 @@ def zauth_root():
         yield Path(tmp_dir)
 
 
+@fixture(scope="session")
+def far_file():
+    with tempfile.TemporaryDirectory() as tmp_path:
+        ff = Path(tmp_path, "farf")
+        ff.write_text("Faaar")
+        yield ff
+
+
 @fixture
-def zauth(server: Server, private_key_path: Path, zauth_root: Path):
+def zauth(server: Server, private_key_path: Path, zauth_root: Path, tmp_path, far_file):
     test_dic = {
         "keys": {
             "s3-key-name-1": {"key": "XYZ", "secret": "XXX"},
@@ -62,17 +70,19 @@ def zauth(server: Server, private_key_path: Path, zauth_root: Path):
                 "port": server.port,
                 "user": TEST_USER,
                 "rsa_key": "rsa-key-name",
-            }
+            },
+            "ssh-name-2": {"host": TEST_HOST, "rsa_key": "rsa-key-name"},
         },
         "bucket-1": {"key": "s3-key-name-1"},
         "bucket-2": {"key": "s3-key-name-2"},
         "ssh-conn-1": {"connection": "ssh-name-1", "path": zauth_root.as_posix()},
         "ssh-conn-2": {"connection": "ssh-name-1"},
+        "ssh-conn-3": {"connection": "ssh-name-2", "path": far_file.parent.as_posix()},
     }
     return ZimmAuth(test_dic)
 
 
-@pytest.fixture
+@fixture
 def idiotic():
     # https://github.com/aio-libs/aiobotocore/issues/755
     # https://github.com/fsspec/s3fs/issues/357
@@ -102,7 +112,7 @@ def idiotic():
     moto.core.botocore_stubber.MockRawResponse = _Old
 
 
-@pytest.fixture(scope="session")
+@fixture(scope="session")
 def zauth_bucket():
 
     with moto.mock_s3():
@@ -159,6 +169,17 @@ def test_boto(zauth: ZimmAuth, zauth_bucket: boto3, tmp_path: Path):
     bucket.upload_file(fpath.as_posix(), "test-uploaded")
     bucket.download_file("test-uploaded", dpath.as_posix())
     assert dpath.read_text() == "fing"
+
+
+def test_localize(zauth: ZimmAuth, tmp_path: Path, far_file: Path):
+    tfile = tmp_path / "fing"
+    ffile = tmp_path / "get"
+    tfile.write_text("boo")
+    os.environ[LOCAL_HOST_NAMES_ENV_VAR] = TEST_HOST
+    with zauth.get_fabric_connection("ssh-conn-3") as conn:
+        conn.put(tfile.as_posix(), "f2")
+        conn.get(far_file, ffile)
+    assert ffile.exists()
 
 
 def test_secret_base():
