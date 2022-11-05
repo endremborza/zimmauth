@@ -71,7 +71,11 @@ def zauth(server: Server, private_key_path: Path, zauth_root: Path, tmp_path, fa
                 "user": TEST_USER,
                 "rsa_key": "rsa-key-name",
             },
-            "ssh-name-2": {"host": TEST_HOST, "rsa_key": "rsa-key-name"},
+            "ssh-name-2": {
+                "host": TEST_HOST,
+                "rsa_key": "rsa-key-name",
+                "user": TEST_USER,
+            },
         },
         "bucket-1": {"key": "s3-key-name-1"},
         "bucket-2": {"key": "s3-key-name-2"},
