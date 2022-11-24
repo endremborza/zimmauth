@@ -91,10 +91,9 @@ class SSHRemote:
         return f"SSH: {self.host}:/{self.path}"
 
     def to_dvc_conf(self, key_store: Path):
-        d = {
-            "url": f"ssh://{self.host}{self.path}",
-            "user": self.user,
-        }
+        if self.host in _get_local_names():
+            return {"url": self.path}
+        d = {"url": f"ssh://{self.host}{self.path}", "user": self.user}
         if self.port:
             d["port"] = self.port
         if self.rsa_key:
@@ -133,8 +132,7 @@ class ZimmAuth:
 
         tmp_dir = TemporaryDirectory()
         ssh_rem = self._ssh_remotes[remote_name]
-        local_names = os.environ.get(LOCAL_HOST_NAMES_ENV_VAR, "").split(";")
-        if ssh_rem.host in local_names:
+        if ssh_rem.host in _get_local_names():
             ctx = LocalContext()
         else:
             key_path = Path(tmp_dir.name, "key")
@@ -206,3 +204,7 @@ class ZimmAuth:
     @property
     def _remotes(self) -> Dict[str, Union[S3Remote, SSHRemote]]:
         return {**self._s3_remotes, **self._ssh_remotes}
+
+
+def _get_local_names():
+    return os.environ.get(LOCAL_HOST_NAMES_ENV_VAR, "").split(";")

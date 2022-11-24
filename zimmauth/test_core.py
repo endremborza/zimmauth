@@ -148,9 +148,10 @@ def test_env_loading():
     assert zauth.get_auth("buc1").secret == "123"
 
 
-def test_dvc(zauth: ZimmAuth, tmp_path: Path, zauth_root: Path, zauth_bucket, idiotic):
+def test_dvc(zauth: ZimmAuth, tmp_path: Path, far_file: Path, zauth_bucket, idiotic):
     cwd = Path.cwd()
     os.chdir(tmp_path)
+    os.environ[LOCAL_HOST_NAMES_ENV_VAR] = TEST_HOST
     try:
         Repo.init(no_scm=True)
         zauth.dump_dvc(key_store=tmp_path / "keys")
@@ -160,6 +161,8 @@ def test_dvc(zauth: ZimmAuth, tmp_path: Path, zauth_root: Path, zauth_bucket, id
         repo.add(kp.as_posix())
         repo.push([kp.as_posix()], remote="ssh-conn-1")
         repo.push([kp.as_posix()], remote="bucket-1")
+        repo.push([kp.as_posix()], remote="ssh-conn-3")
+        assert ["90"] == [f.name for f in far_file.parent.iterdir() if f != far_file]
 
     finally:
         os.chdir(cwd)
