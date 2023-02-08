@@ -182,11 +182,16 @@ def test_localize(zauth: ZimmAuth, tmp_path: Path, far_file: Path):
     tfile = tmp_path / "fing"
     ffile = tmp_path / "get"
     tfile.write_text("boo")
+    in_cwd_file = Path("_file").absolute()
+    in_cwd_file.write_text("botd")
     os.environ[LOCAL_HOST_NAMES_ENV_VAR] = TEST_HOST
     with zauth.get_fabric_connection("ssh-conn-3") as conn:
+        conn.put(in_cwd_file)
         conn.put(tfile.as_posix(), "f2")
         conn.get(far_file, ffile)
     assert ffile.exists()
+    assert (far_file.parent / in_cwd_file.name).read_text() == "botd"
+    in_cwd_file.unlink()
 
 
 def test_secret_base():
