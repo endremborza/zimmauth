@@ -156,7 +156,7 @@ class ZimmAuth:
     def dump_dvc(self, local=True, key_store=CONF_PATH):
         from dvc.config import Config
 
-        conf = Config()
+        conf = Config(Path(".dvc"))
         with conf.edit("local" if local else "global") as ced:
             ced["remote"] = {
                 k: v.to_dvc_conf(key_store) for k, v in self._remotes.items()
@@ -164,7 +164,6 @@ class ZimmAuth:
         self._dump_keys(key_store)
 
     def get_boto_bucket(self, remote_name):
-
         import boto3
 
         s3_rem = self._s3_remotes[remote_name]
