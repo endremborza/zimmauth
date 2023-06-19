@@ -164,7 +164,11 @@ def test_dvc(zauth: ZimmAuth, tmp_path: Path, far_file: Path, zauth_bucket, idio
         repo.push([kp.as_posix()], remote="ssh-conn-1")
         # repo.push([kp.as_posix()], remote="bucket-1") TODO maybe this will work again
         repo.push([kp.as_posix()], remote="ssh-conn-3")
-        assert ["90"] == [f.name for f in far_file.parent.iterdir() if f != far_file]
+        assert ["90"] == [
+            f.name
+            for f in (far_file.parent / "files" / "md5").iterdir()
+            if f != far_file
+        ]
 
     finally:
         os.chdir(cwd)

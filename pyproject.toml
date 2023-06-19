@@ -13,7 +13,7 @@ ssh = ["fabric", "decorator"]
 test = [
     "branthebuilder", 
     "mock-ssh-server", 
-    "dvc[s3,ssh]", 
+    "dvc[s3,ssh]>=3.1.0", 
     "moto", 
     "aiobotocore", 
     "boto3", 
