@@ -1,10 +1,12 @@
 import os
 import secrets
+import sys
 from base64 import urlsafe_b64decode as b64d
 from base64 import urlsafe_b64encode as b64e
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from subprocess import check_call
 from tempfile import TemporaryDirectory
 from typing import Callable, Dict, Optional, Union
 
@@ -68,15 +70,17 @@ class S3Remote:
     bucket_name: str
     auth: S3Auth
 
-    def to_dvc_conf(self, _):
-        d = {
-            "url": f"s3://{self.bucket_name}",
-            "access_key_id": self.auth.key,
-            "secret_access_key": self.auth.secret,
-        }
-        if self.auth.endpoint:
-            d["endpointurl"] = self.auth.endpoint
-        return d
+    def get_dvc_string(self):
+        return f"s3://{self.bucket_name}"
+
+    def add_dvc_modifies(self, _):
+        for k, v in [
+            ("access_key_id", self.auth.key),
+            ("secret_access_key", self.auth.secret),
+            ("endpointurl", self.auth.endpoint),
+        ]:
+            if v:
+                yield k, v
 
 
 @dataclass
@@ -84,21 +88,24 @@ class SSHRemote:
     host: str
     path: str = ""
     user: str = field(default_factory=os.getlogin)
-    port: Optional[int] = None
+    port: int | None = None
     rsa_key: Optional[str] = None
 
     def __repr__(self) -> str:
         return f"SSH: {self.host}:/{self.path}"
 
-    def to_dvc_conf(self, key_store: Path):
+    def get_dvc_string(self):
         if self.host in _get_local_names():
-            return {"url": self.path}
-        d = {"url": f"ssh://{self.host}{self.path}", "user": self.user}
-        if self.port:
-            d["port"] = self.port
+            return self.path
+        return f"ssh://{self.user}@{self.host}{self.path}"
+
+    def add_dvc_modifies(self, key_store: Path):
+        if self.host in _get_local_names():
+            return []
         if self.rsa_key:
-            d["keyfile"] = (key_store / self.rsa_key).as_posix()
-        return d
+            yield ("keyfile", (key_store / self.rsa_key).as_posix())
+        if self.port:
+            yield ("port", str(self.port))
 
 
 class ZimmAuth:
@@ -153,14 +160,15 @@ class ZimmAuth:
             yield ctx
         tmp_dir.cleanup()
 
-    def dump_dvc(self, local=True, key_store=CONF_PATH):
-        from dvc.config import Config
+    def dump_dvc(self, local=True, key_store=CONF_PATH, executable=sys.executable):
+        for k, v in self._remotes.items():
+            runbase = [executable, "-m", "dvc", "remote"]
+            lflag = "--local" if local else "--global"
+            remstr = v.get_dvc_string()
+            check_call([*runbase, "add", lflag, "-f", k, remstr])
+            for mod_k, mod_v in v.add_dvc_modifies(key_store):
+                check_call([*runbase, "modify", lflag, k, mod_k, mod_v])
 
-        conf = Config(Path(".dvc"))
-        with conf.edit("local" if local else "global") as ced:
-            ced["remote"] = {
-                k: v.to_dvc_conf(key_store) for k, v in self._remotes.items()
-            }
         self._dump_keys(key_store)
 
     def get_boto_bucket(self, remote_name):
